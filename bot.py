@@ -86,7 +86,7 @@ def get_main_keyboard():
 # --- Handlers ---
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-   welcome_text = (
+    welcome_text = (
         "💕 **Wei Wei & Kay Kay's Agenda**\n\n"
         "What are we up to today?\n\n"
         "**Quick cheat sheet:**\n"
@@ -94,7 +94,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "• `/freetime` — see when we're both free\n"
         "• `/addidea <idea>` — save a date idea\n"
         "• `/adddate <event> | YYYY-MM-DD` — set a countdown\n"
-        "• `/spin opt1 | opt2` — randomniser when we can't decide\n"
+        "• `/spin opt1 | opt2` — tiebreaker spinner\n"
         "• `/thankyou <note>` — leave a cute note\n\n"
         "_Tap a button below to check schedule & notes!_"
     )
