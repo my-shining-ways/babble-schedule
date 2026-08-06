@@ -20,12 +20,13 @@ def is_authorized(update: Update) -> bool:
         return True
     return update.effective_user and update.effective_user.id in ALLOWED_USERS
 
-# --- Database Initialization ---
+# --- Fixed Database Initialization ---
 def init_db():
     conn = sqlite3.connect("couple_bot.db")
     cursor = conn.cursor()
     
-    # Events table with start_time and end_time
+    # Drop old table if structure doesn't match and recreate cleanly
+    cursor.execute("DROP TABLE IF EXISTS events")
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS events (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -38,7 +39,6 @@ def init_db():
         )
     """)
     
-    # Date Ideas / Bucket List table
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS bucket_list (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -47,7 +47,6 @@ def init_db():
         )
     """)
     
-    # Special Dates / Countdowns table
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS special_dates (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -56,7 +55,6 @@ def init_db():
         )
     """)
 
-    # Gratitude Notes table
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS gratitude_notes (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -123,7 +121,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             welcome_text, parse_mode="Markdown", reply_markup=get_main_keyboard()
         )
 
-# --- Add Event with Start/End Time ---
+# --- Fixed Add Event Handler ---
 async def add_event(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_authorized(update):
         return
@@ -135,7 +133,7 @@ async def add_event(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if len(parts) < 2:
         await update.message.reply_text(
             "⚠️ **Format:** `/add Title | YYYY-MM-DD HH:MM - HH:MM | [Location] | [Notes]`\n"
-            "Example: `/add Bouldering | 2026-08-08 15:00 - 17:00 | Boulder World | Wear sports gear`",
+            "Example: `/add Work | 2026-08-06 09:00 - 18:00`",
             parse_mode="Markdown"
         )
         return
@@ -147,16 +145,16 @@ async def add_event(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     try:
         if "-" in time_part:
-            # Format: YYYY-MM-DD HH:MM - HH:MM
-            date_and_start, end_time_str = time_part.split("-")
-            date_and_start = date_and_start.strip()
+            # Splits "2026-08-06 09:00 - 18:00" into "2026-08-06 09:00" and "18:00"
+            start_str, end_time_str = time_part.rsplit("-", 1)
+            start_str = start_str.strip()
             end_time_str = end_time_str.strip()
 
-            start_time = datetime.strptime(date_and_start, "%Y-%m-%d %H:%M")
+            start_time = datetime.strptime(start_str, "%Y-%m-%d %H:%M")
             end_time_dt = datetime.strptime(end_time_str, "%H:%M").time()
             end_time = datetime.combine(start_time.date(), end_time_dt)
         else:
-            # Format: YYYY-MM-DD HH:MM (Defaults to 1-hour event)
+            # Defaults to 1 hour if no end time given
             start_time = datetime.strptime(time_part.strip(), "%Y-%m-%d %H:%M")
             end_time = start_time + timedelta(hours=1)
 
@@ -177,8 +175,12 @@ async def add_event(update: Update, context: ContextTypes.DEFAULT_TYPE):
             msg += f"\n📝 Notes: {notes}"
 
         await update.message.reply_text(msg, parse_mode="Markdown", reply_markup=get_main_keyboard())
-    except ValueError:
-        await update.message.reply_text("⚠️ Invalid format. Use `YYYY-MM-DD HH:MM - HH:MM` or `YYYY-MM-DD HH:MM`.")
+    except Exception as e:
+        await update.message.reply_text(
+            "⚠️ Invalid time format! Make sure to include spaces around the dash like:\n"
+            "`/add Work | 2026-08-06 09:00 - 18:00`",
+            parse_mode="Markdown"
+        )
 
 # --- Views: Week & Month ---
 def get_week_text():
