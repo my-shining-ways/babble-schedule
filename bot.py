@@ -73,8 +73,8 @@ def get_main_keyboard():
             InlineKeyboardButton("💡 Date Ideas", callback_data="view_bucket"),
         ],
         [
-            InlineKeyboardButton("🎲 Pick For Us", callback_data="pick_date"),
-            InlineKeyboardButton("🎰 Help Us Decide", callback_data="help_spin"),
+            InlineKeyboardButton("👫 Date Ideas Wishlist", callback_data="pick_date"),
+            InlineKeyboardButton("🎲 Help Us Decide", callback_data="help_spin"),
         ],
         [
             InlineKeyboardButton("⏳ Countdowns", callback_data="view_countdowns"),
@@ -90,7 +90,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "💕 **Wei Wei & Kay Kay's Agenda**\n\n"
         "What are we up to today?\n\n"
         "**Quick cheat sheet:**\n"
-        "• `/add Title | YYYY-MM-DD HH:MM | [Loc] | [Notes]`\n"
+        "• `/add Title | YYYY-MM-DD HH:MM | [Loc] | [Notes]` — insert a schedule\n"
         "• `/freetime` — see when we're both free\n"
         "• `/addidea <idea>` — save a date idea\n"
         "• `/adddate <event> | YYYY-MM-DD` — set a countdown\n"
