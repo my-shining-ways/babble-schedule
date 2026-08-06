@@ -62,23 +62,23 @@ def init_db():
     conn.close()
 
 # --- Helper Keyboards ---
-def get_main_keyboard():
+ddef get_main_keyboard():
     keyboard = [
         [
-            InlineKeyboardButton("🗓️ Week View", callback_data="view_week"),
-            InlineKeyboardButton("📆 Month View", callback_data="view_month"),
+            InlineKeyboardButton("🗓️ This Week", callback_data="view_week"),
+            InlineKeyboardButton("📆 This Month", callback_data="view_month"),
         ],
         [
-            InlineKeyboardButton("🔍 Find Free Time", callback_data="find_freetime"),
-            InlineKeyboardButton("💡 Date Wishlist", callback_data="view_bucket"),
+            InlineKeyboardButton("🔍 Free Slots", callback_data="find_freetime"),
+            InlineKeyboardButton("💡 Date Ideas", callback_data="view_bucket"),
         ],
         [
-            InlineKeyboardButton("🎲 Pick Wishlist Date", callback_data="pick_date"),
-            InlineKeyboardButton("🎯 Spin Decision", callback_data="help_spin"),
+            InlineKeyboardButton("🎲 Pick For Us", callback_data="pick_date"),
+            InlineKeyboardButton("🎰 Help Us Decide", callback_data="help_spin"),
         ],
         [
             InlineKeyboardButton("⏳ Countdowns", callback_data="view_countdowns"),
-            InlineKeyboardButton("💌 Read Love Notes", callback_data="view_thanks"),
+            InlineKeyboardButton("💌 Love Notes", callback_data="view_thanks"),
         ]
     ]
     return InlineKeyboardMarkup(keyboard)
@@ -86,16 +86,17 @@ def get_main_keyboard():
 # --- Handlers ---
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    welcome_text = (
-        "❤️ **Our Shared Couple Calendar Bot**\n\n"
-        "Tap the quick buttons below or use these commands:\n\n"
-        "📌 **Commands:**\n"
+   welcome_text = (
+        "💕 **Wei Wei & Kay Kay's Agenda**\n\n"
+        "What are we up to today?\n\n"
+        "**Quick cheat sheet:**\n"
         "• `/add Title | YYYY-MM-DD HH:MM | [Loc] | [Notes]`\n"
-        "• `/freetime` - Find mutual free slots\n"
-        "• `/addidea Idea Title` - Add to date wishlist\n"
-        "• `/adddate Title | YYYY-MM-DD` - Add countdown\n"
-        "• `/spin Option 1 | Option 2 | Option 3` - Decision maker\n"
-        "• `/thankyou Your message here` - Send a gratitude note"
+        "• `/freetime` — see when we're both free\n"
+        "• `/addidea <idea>` — save a date idea\n"
+        "• `/adddate <event> | YYYY-MM-DD` — set a countdown\n"
+        "• `/spin opt1 | opt2` — randomniser when we can't decide\n"
+        "• `/thankyou <note>` — leave a cute note\n\n"
+        "_Tap a button below to check schedule & notes!_"
     )
     if update.message:
         await update.message.reply_text(welcome_text, parse_mode="Markdown", reply_markup=get_main_keyboard())
