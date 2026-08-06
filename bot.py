@@ -62,7 +62,7 @@ def init_db():
     conn.close()
 
 # --- Helper Keyboards ---
-ddef get_main_keyboard():
+def get_main_keyboard():
     keyboard = [
         [
             InlineKeyboardButton("🗓️ This Week", callback_data="view_week"),
