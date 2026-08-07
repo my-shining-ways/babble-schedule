@@ -479,10 +479,24 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await query.message.edit_text(text, parse_mode="Markdown", reply_markup=get_main_keyboard())
 
-# --- Main App ---
+# --- Main App with PythonAnywhere Proxy Support ---
 if __name__ == "__main__":
     init_db()
-    app = ApplicationBuilder().token(TOKEN).build()
+    
+    # PythonAnywhere requires using their proxy server for free accounts
+    PROXY_URL = "http://proxy.server:3128"
+
+    app = (
+        ApplicationBuilder()
+        .token(TOKEN)
+        .proxy(PROXY_URL)
+        .get_updates_proxy(PROXY_URL)
+        .connect_timeout(30.0)
+        .read_timeout(30.0)
+        .write_timeout(30.0)
+        .pool_timeout(30.0)
+        .build()
+    )
 
     # Commands
     app.add_handler(CommandHandler("start", start))
