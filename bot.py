@@ -1,7 +1,7 @@
 import os
 import sqlite3
-from datetime import datetime, timedelta
 import random
+from datetime import datetime, timedelta
 from flask import Flask, request
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
@@ -11,7 +11,8 @@ from telegram.ext import (
     ContextTypes,
 )
 
-TOKEN = "8877142330:AAFr8L1zSh1NQ1UToKh3hylDbYjsSO0Gh2Q"
+TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+flask_app = Flask(__name__)
 
 # Put both of your numerical Telegram User IDs here:
 ALLOWED_USERS = []  # e.g., [123456789, 987654321]
