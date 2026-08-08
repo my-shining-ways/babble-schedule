@@ -110,7 +110,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "• `/adddate <event> | YYYY-MM-DD` — set a countdown\n"
         "• `/thankyou <note>` — leave love note\n"
         "• `/freetime` | — see when we're both free\n"
-        "• `/spin opt1 | opt2`\n — tiebreaker spinner\n"
+        "• `/spin opt1 | opt2` — tiebreaker spinner\n\n"
         "✏️ *Edit / Delete (use ID from lists):*\n"
         "• `/delevent <id>` | `/editevent <id> | Title | ...`\n"
         "• `/delidea <id>` | `/editidea <id> | <new idea>`\n"
