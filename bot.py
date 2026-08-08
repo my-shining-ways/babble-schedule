@@ -11,7 +11,7 @@ from telegram.ext import (
     ContextTypes,
 )
 
-TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+TOKEN = "8877142330:AAFr8L1zSh1NQ1UToKh3hylDbYjsSO0Gh2Q"
 
 # Put both of your numerical Telegram User IDs here:
 ALLOWED_USERS = []  # e.g., [123456789, 987654321]
