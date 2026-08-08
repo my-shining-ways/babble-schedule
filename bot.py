@@ -2,6 +2,7 @@ import os
 import sqlite3
 from datetime import datetime, timedelta
 import random
+from flask import Flask, request
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     ApplicationBuilder,
@@ -20,13 +21,14 @@ def is_authorized(update: Update) -> bool:
         return True
     return update.effective_user and update.effective_user.id in ALLOWED_USERS
 
-# --- Fixed Database Initialization ---
+# Initialize Flask app for 24/7 PythonAnywhere Web App
+flask_app = Flask(__name__)
+
+# --- Database Initialization ---
 def init_db():
     conn = sqlite3.connect("couple_bot.db")
     cursor = conn.cursor()
     
-    # Drop old table if structure doesn't match and recreate cleanly
-    cursor.execute("DROP TABLE IF EXISTS events")
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS events (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -67,6 +69,8 @@ def init_db():
     conn.commit()
     conn.close()
 
+init_db()
+
 # --- Helper Keyboards ---
 def get_main_keyboard():
     keyboard = [
@@ -95,10 +99,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     welcome_text = (
-        "💗 **Wei Wei & Kay Kay's Agenda!**\n\n"
+        "💕 **Wei Wei & Kay Kay's Agenda**\n\n"
         "What are we up to today?\n\n"
         "**Quick cheat sheet:**\n"
-        "• `/add Title | YYYY-MM-DD HH:MM - HH:MM | [Loc] | [Notes]` — insert schedule\n"
+        "• `/add Title | YYYY-MM-DD HH:MM - HH:MM | [Loc] | [Notes]`\n"
         "• `/freetime` — see when we're both free\n"
         "• `/addidea <idea>` — save a date idea\n"
         "• `/adddate <event> | YYYY-MM-DD` — set a countdown\n"
@@ -111,17 +115,16 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         sent_msg = await update.message.reply_text(
             welcome_text, parse_mode="Markdown", reply_markup=get_main_keyboard()
         )
-        # Auto-pin the start message to the chat
         try:
             await sent_msg.pin(disable_notification=True)
         except Exception:
-            pass  # Handles cases where bot lacks pin permission in basic chats
+            pass
     elif update.callback_query:
         await update.callback_query.message.edit_text(
             welcome_text, parse_mode="Markdown", reply_markup=get_main_keyboard()
         )
 
-# --- Fixed Add Event Handler ---
+# --- Add Event Handler ---
 async def add_event(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_authorized(update):
         return
@@ -145,7 +148,6 @@ async def add_event(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     try:
         if "-" in time_part:
-            # Splits "2026-08-06 09:00 - 18:00" into "2026-08-06 09:00" and "18:00"
             start_str, end_time_str = time_part.rsplit("-", 1)
             start_str = start_str.strip()
             end_time_str = end_time_str.strip()
@@ -154,7 +156,6 @@ async def add_event(update: Update, context: ContextTypes.DEFAULT_TYPE):
             end_time_dt = datetime.strptime(end_time_str, "%H:%M").time()
             end_time = datetime.combine(start_time.date(), end_time_dt)
         else:
-            # Defaults to 1 hour if no end time given
             start_time = datetime.strptime(time_part.strip(), "%Y-%m-%d %H:%M")
             end_time = start_time + timedelta(hours=1)
 
@@ -175,10 +176,9 @@ async def add_event(update: Update, context: ContextTypes.DEFAULT_TYPE):
             msg += f"\n📝 Notes: {notes}"
 
         await update.message.reply_text(msg, parse_mode="Markdown", reply_markup=get_main_keyboard())
-    except Exception as e:
+    except Exception:
         await update.message.reply_text(
-            "⚠️ Invalid time format! Make sure to include spaces around the dash like:\n"
-            "`/add Work | 2026-08-06 09:00 - 18:00`",
+            "⚠️ Invalid time format! Example:\n`/add Work | 2026-08-06 09:00 - 18:00`",
             parse_mode="Markdown"
         )
 
@@ -217,7 +217,6 @@ def get_week_text():
                 entry += f" 📝_{notes}_"
             response += entry + "\n"
 
-    # Attach Gratitude Notes
     week_ago = now - timedelta(days=7)
     cursor.execute(
         "SELECT user_name, note FROM gratitude_notes WHERE created_at >= ? ORDER BY created_at DESC",
@@ -297,8 +296,7 @@ async def spin_decision(update: Update, context: ContextTypes.DEFAULT_TYPE):
     raw_args = " ".join(context.args)
     if not raw_args or "|" not in raw_args:
         await update.message.reply_text(
-            "🎰 **How to use /spin:**\nSeparate options with `|`:\n"
-            "`/spin Italian | Sushi | Burgers`",
+            "🎰 **How to use /spin:**\n`/spin Italian | Sushi | Burgers`",
             parse_mode="Markdown"
         )
         return
@@ -354,7 +352,7 @@ def get_gratitude_text():
         res += f"• **{sender}** _({dt.strftime('%b %d')})_: \"{note_text}\"\n"
     return res
 
-# --- Bucket List & Randomizer ---
+# --- Bucket List & Countdowns ---
 async def add_idea(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_authorized(update):
         return
@@ -401,7 +399,6 @@ def pick_random_idea():
     selected_idea, user_name = random.choice(rows)
     return f"🎲 **Random Date Pick:**\n\n👉 **{selected_idea}**\n_(Added by {user_name})_"
 
-# --- Countdowns ---
 async def add_special_date(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_authorized(update):
         return
@@ -449,7 +446,7 @@ def get_countdowns_text():
             res += f"• **{title}**: Passed {abs(days_left)} days ago\n"
     return res
 
-# --- Callback Handler for Tap Buttons ---
+# --- Callback Handler ---
 async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_authorized(update):
         return
@@ -479,37 +476,27 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await query.message.edit_text(text, parse_mode="Markdown", reply_markup=get_main_keyboard())
 
-# --- Main App with PythonAnywhere Proxy Support ---
-if __name__ == "__main__":
-    init_db()
-    
-    # PythonAnywhere requires using their proxy server for free accounts
-    PROXY_URL = "http://proxy.server:3128"
+# --- Build Telegram Application & Handlers ---
+ptb_app = ApplicationBuilder().token(TOKEN).build()
+ptb_app.add_handler(CommandHandler("start", start))
+ptb_app.add_handler(CommandHandler("help", start))
+ptb_app.add_handler(CommandHandler("add", add_event))
+ptb_app.add_handler(CommandHandler("addidea", add_idea))
+ptb_app.add_handler(CommandHandler("adddate", add_special_date))
+ptb_app.add_handler(CommandHandler("spin", spin_decision))
+ptb_app.add_handler(CommandHandler("thankyou", add_thankyou))
+ptb_app.add_handler(CommandHandler("freetime", lambda u, c: u.message.reply_text(calculate_free_time(), parse_mode="Markdown")))
+ptb_app.add_handler(CallbackQueryHandler(button_callback))
 
-    app = (
-        ApplicationBuilder()
-        .token(TOKEN)
-        .proxy(PROXY_URL)
-        .get_updates_proxy(PROXY_URL)
-        .connect_timeout(30.0)
-        .read_timeout(30.0)
-        .write_timeout(30.0)
-        .pool_timeout(30.0)
-        .build()
-    )
+# --- Flask Routes for Webhook Server ---
+@flask_app.route("/", methods=["GET"])
+def index():
+    return "Bot Web App is live 24/7!", 200
 
-    # Commands
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("help", start))
-    app.add_handler(CommandHandler("add", add_event))
-    app.add_handler(CommandHandler("addidea", add_idea))
-    app.add_handler(CommandHandler("adddate", add_special_date))
-    app.add_handler(CommandHandler("spin", spin_decision))
-    app.add_handler(CommandHandler("thankyou", add_thankyou))
-    app.add_handler(CommandHandler("freetime", lambda u, c: u.message.reply_text(calculate_free_time(), parse_mode="Markdown")))
-
-    # Button Callbacks
-    app.add_handler(CallbackQueryHandler(button_callback))
-
-    print("Couple Bot is running...")
-    app.run_polling()
+@flask_app.route(f"/{TOKEN}", methods=["POST"])
+async def webhook():
+    if request.method == "POST":
+        update = Update.de_json(request.get_json(force=True), ptb_app.bot)
+        await ptb_app.process_update(update)
+        return "ok", 200
+    return "error", 400
