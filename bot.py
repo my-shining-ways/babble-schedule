@@ -86,8 +86,8 @@ def get_main_keyboard():
             InlineKeyboardButton("💡 Date Ideas", callback_data="view_bucket"),
         ],
         [
-            InlineKeyboardButton("🍴 Pick A Place For Us", callback_data="pick_date"),
-            InlineKeyboardButton("🎲 Help Us Decide", callback_data="help_spin"),
+            InlineKeyboardButton("🎲 Pick For Us", callback_data="pick_date"),
+            InlineKeyboardButton("🎯 Help Us Decide", callback_data="help_spin"),
         ],
         [
             InlineKeyboardButton("⏳ Countdowns", callback_data="view_countdowns"),
@@ -102,15 +102,15 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     welcome_text = (
-        "💕 **Wei Wei & Kay Kay's Agenda**\n\n"
+        "💕 *Wei Wei & Kay Kay's Agenda*\n\n"
         "What are we up to today?\n\n"
-        "**📌 Quick Add Cheat Sheet:**\n"
+        "📌 *Quick Add Cheat Sheet:*\n"
         "• `/add Title | YYYY-MM-DD HH:MM - HH:MM | [Loc] | [Notes]`\n"
         "• `/addidea <idea>` — save date idea\n"
         "• `/adddate <event> | YYYY-MM-DD` — countdown\n"
         "• `/thankyou <note>` — leave love note\n"
         "• `/freetime` | `/spin opt1 | opt2`\n\n"
-        "**✏️ Edit / Delete (use ID from lists):**\n"
+        "✏️ *Edit / Delete (use ID from lists):*\n"
         "• `/delevent <id>` | `/editevent <id> | Title | ...`\n"
         "• `/delidea <id>` | `/editidea <id> | <new idea>`\n"
         "• `/deldate <id>` | `/editdate <id> | Title | YYYY-MM-DD`\n"
@@ -143,7 +143,7 @@ async def add_event(update: Update, context: ContextTypes.DEFAULT_TYPE):
     parts = [p.strip() for p in raw_args.split("|")]
     if len(parts) < 2:
         await update.message.reply_text(
-            "⚠️ **Format:** `/add Title | YYYY-MM-DD HH:MM - HH:MM | [Location] | [Notes]`\n"
+            "⚠️ *Format:* `/add Title | YYYY-MM-DD HH:MM - HH:MM | [Location] | [Notes]`\n"
             "Example: `/add Work | 2026-08-06 09:00 - 18:00`",
             parse_mode="Markdown"
         )
@@ -178,7 +178,7 @@ async def add_event(update: Update, context: ContextTypes.DEFAULT_TYPE):
         conn.close()
 
         formatted_time = f"{start_time.strftime('%a, %b %d @ %I:%M %p')} - {end_time.strftime('%I:%M %p')}"
-        msg = f"✅ **Added (ID: {event_id}) by {user_name}!**\n📌 **{title}**\n📅 {formatted_time}"
+        msg = f"✅ *Added (ID: {event_id}) by {user_name}!*\n📌 *{title}*\n📅 {formatted_time}"
         if location:
             msg += f"\n📍 Location: {location}"
         if notes:
@@ -195,7 +195,7 @@ async def delete_event(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_authorized(update):
         return
     if not context.args or not context.args[0].isdigit():
-        await update.message.reply_text("⚠️ **Format:** `/delevent <ID>`\nExample: `/delevent 3`", parse_mode="Markdown")
+        await update.message.reply_text("⚠️ *Format:* `/delevent <ID>`\nExample: `/delevent 3`", parse_mode="Markdown")
         return
 
     event_id = int(context.args[0])
@@ -219,7 +219,7 @@ async def edit_event(update: Update, context: ContextTypes.DEFAULT_TYPE):
     parts = [p.strip() for p in raw_args.split("|")]
     if len(parts) < 3 or not parts[0].isdigit():
         await update.message.reply_text(
-            "⚠️ **Format:** `/editevent <ID> | Title | YYYY-MM-DD HH:MM - HH:MM | [Location] | [Notes]`\n"
+            "⚠️ *Format:* `/editevent <ID> | Title | YYYY-MM-DD HH:MM - HH:MM | [Location] | [Notes]`\n"
             "Example: `/editevent 3 | Dinner | 2026-08-08 19:00 - 21:00 | VivoCity`",
             parse_mode="Markdown"
         )
@@ -252,7 +252,7 @@ async def edit_event(update: Update, context: ContextTypes.DEFAULT_TYPE):
         conn.close()
 
         if updated > 0:
-            await update.message.reply_text(f"✏️ Schedule `[ID: {event_id}]` updated to **{title}**!", parse_mode="Markdown", reply_markup=get_main_keyboard())
+            await update.message.reply_text(f"✏️ Schedule `[ID: {event_id}]` updated to *{title}*!", parse_mode="Markdown", reply_markup=get_main_keyboard())
         else:
             await update.message.reply_text(f"⚠️ Schedule ID `{event_id}` not found.", parse_mode="Markdown")
     except Exception:
@@ -270,7 +270,7 @@ def get_week_text():
     )
     rows = cursor.fetchall()
 
-    response = "🗓️ **Weekly Preview (Next 7 Days)**\n"
+    response = "🗓️ *Weekly Preview (Next 7 Days)*\n"
     if not rows:
         response += "\n✨ No scheduled activities! Perfect time to plan a date.\n"
     else:
@@ -282,7 +282,7 @@ def get_week_text():
             
             if day_header != current_day:
                 current_day = day_header
-                response += f"\n📅 **{current_day}**\n"
+                response += f"\n📅 *{current_day}*\n"
             
             time_slot = f"{s_dt.strftime('%I:%M %p')} - {e_dt.strftime('%I:%M %p')}"
             entry = f"  • `[ID:{eid}]` `{time_slot}` - {title} _({user_name})_"
@@ -301,7 +301,7 @@ def get_week_text():
     conn.close()
 
     if thanks_rows:
-        response += "\n\n💌 **Love Notes This Week:**\n"
+        response += "\n\n💌 *Love Notes This Week:*\n"
         for nid, sender, note_text in thanks_rows:
             response += f"• `[ID:{nid}]` _{sender}_: \"{note_text}\"\n"
 
@@ -323,14 +323,14 @@ def get_month_text():
 
     month_name = now.strftime("%B %Y")
     if not rows:
-        return f"✨ No activities scheduled for **{month_name}** yet."
+        return f"✨ No activities scheduled for *{month_name}* yet."
 
-    response = f"📆 **Month at a Glance ({month_name})**\n\n"
+    response = f"📆 *Month at a Glance ({month_name})*\n\n"
     for eid, user_name, title, stime_str, etime_str, loc in rows:
         s_dt = datetime.strptime(stime_str, "%Y-%m-%d %H:%M:%S")
         e_dt = datetime.strptime(etime_str, "%Y-%m-%d %H:%M:%S")
         loc_str = f" [📍 {loc}]" if loc else ""
-        response += f"• `[ID:{eid}]` **{s_dt.strftime('%b %d (%a)')}** (`{s_dt.strftime('%I:%M %p')}-{e_dt.strftime('%I:%M %p')}`): {title} _({user_name})_{loc_str}\n"
+        response += f"• `[ID:{eid}]` *{s_dt.strftime('%b %d (%a)')}* (`{s_dt.strftime('%I:%M %p')}-{e_dt.strftime('%I:%M %p')}`): {title} _({user_name})_{loc_str}\n"
     return response
 
 # ==================== DATE IDEAS / WISHLIST ====================
@@ -342,7 +342,7 @@ async def add_idea(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_name = update.effective_user.first_name
     idea = " ".join(context.args).strip()
     if not idea:
-        await update.message.reply_text("⚠️ **Format:** `/addidea Try new cafe`", parse_mode="Markdown")
+        await update.message.reply_text("⚠️ *Format:* `/addidea Try new cafe`", parse_mode="Markdown")
         return
 
     conn = sqlite3.connect(DB_PATH)
@@ -352,13 +352,13 @@ async def add_idea(update: Update, context: ContextTypes.DEFAULT_TYPE):
     conn.commit()
     conn.close()
 
-    await update.message.reply_text(f"💡 Added to Wishlist `[ID: {idea_id}]`: **{idea}**", parse_mode="Markdown", reply_markup=get_main_keyboard())
+    await update.message.reply_text(f"💡 Added to Wishlist `[ID: {idea_id}]`: *{idea}*", parse_mode="Markdown", reply_markup=get_main_keyboard())
 
 async def delete_idea(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_authorized(update):
         return
     if not context.args or not context.args[0].isdigit():
-        await update.message.reply_text("⚠️ **Format:** `/delidea <ID>`\nExample: `/delidea 2`", parse_mode="Markdown")
+        await update.message.reply_text("⚠️ *Format:* `/delidea <ID>`\nExample: `/delidea 2`", parse_mode="Markdown")
         return
 
     idea_id = int(context.args[0])
@@ -380,7 +380,7 @@ async def edit_idea(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     raw_args = " ".join(context.args)
     if "|" not in raw_args:
-        await update.message.reply_text("⚠️ **Format:** `/editidea <ID> | <new idea>`\nExample: `/editidea 2 | Go ice skating`", parse_mode="Markdown")
+        await update.message.reply_text("⚠️ *Format:* `/editidea <ID> | <new idea>`\nExample: `/editidea 2 | Go ice skating`", parse_mode="Markdown")
         return
 
     parts = raw_args.split("|", 1)
@@ -399,7 +399,7 @@ async def edit_idea(update: Update, context: ContextTypes.DEFAULT_TYPE):
     conn.close()
 
     if updated > 0:
-        await update.message.reply_text(f"✏️ Date idea `[ID: {idea_id}]` updated to: **{new_idea}**", parse_mode="Markdown", reply_markup=get_main_keyboard())
+        await update.message.reply_text(f"✏️ Date idea `[ID: {idea_id}]` updated to: *{new_idea}*", parse_mode="Markdown", reply_markup=get_main_keyboard())
     else:
         await update.message.reply_text(f"⚠️ Idea ID `{idea_id}` not found.", parse_mode="Markdown")
 
@@ -413,7 +413,7 @@ def get_bucket_text():
     if not rows:
         return "💡 Your Date Wishlist is empty! Use `/addidea <idea>` to add items."
 
-    res = "💡 **Date Night Wishlist**\n\n"
+    res = "💡 *Date Night Wishlist*\n\n"
     for item_id, user_name, idea in rows:
         res += f"• `[ID:{item_id}]` {idea} _(added by {user_name})_\n"
     return res
@@ -429,7 +429,7 @@ def pick_random_idea():
         return "🎲 Your wishlist is empty! Add ideas first using `/addidea`."
     
     item_id, selected_idea, user_name = random.choice(rows)
-    return f"🎲 **Random Date Pick:**\n\n👉 `[ID:{item_id}]` **{selected_idea}**\n_(Added by {user_name})_"
+    return f"🎲 *Random Date Pick:*\n\n👉 `[ID:{item_id}]` *{selected_idea}*\n_(Added by {user_name})_"
 
 # ==================== SPECIAL DATES / COUNTDOWNS ====================
 
@@ -454,7 +454,7 @@ async def add_special_date(update: Update, context: ContextTypes.DEFAULT_TYPE):
         conn.commit()
         conn.close()
 
-        await update.message.reply_text(f"⏳ Countdown added `[ID: {date_id}]` for **{title}** on {tdate}!", parse_mode="Markdown", reply_markup=get_main_keyboard())
+        await update.message.reply_text(f"⏳ Countdown added `[ID: {date_id}]` for *{title}* on {tdate}!", parse_mode="Markdown", reply_markup=get_main_keyboard())
     except ValueError:
         await update.message.reply_text("⚠️ Invalid date format. Use `YYYY-MM-DD`.")
 
@@ -462,7 +462,7 @@ async def delete_special_date(update: Update, context: ContextTypes.DEFAULT_TYPE
     if not is_authorized(update):
         return
     if not context.args or not context.args[0].isdigit():
-        await update.message.reply_text("⚠️ **Format:** `/deldate <ID>`\nExample: `/deldate 1`", parse_mode="Markdown")
+        await update.message.reply_text("⚠️ *Format:* `/deldate <ID>`\nExample: `/deldate 1`", parse_mode="Markdown")
         return
 
     date_id = int(context.args[0])
@@ -484,7 +484,7 @@ async def edit_special_date(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     raw_args = " ".join(context.args)
     if "|" not in raw_args:
-        await update.message.reply_text("⚠️ **Format:** `/editdate <ID> | Title | YYYY-MM-DD`\nExample: `/editdate 1 | Trip to Japan | 2026-12-15`", parse_mode="Markdown")
+        await update.message.reply_text("⚠️ *Format:* `/editdate <ID> | Title | YYYY-MM-DD`\nExample: `/editdate 1 | Trip to Japan | 2026-12-15`", parse_mode="Markdown")
         return
 
     parts = [p.strip() for p in raw_args.split("|")]
@@ -505,7 +505,7 @@ async def edit_special_date(update: Update, context: ContextTypes.DEFAULT_TYPE):
         conn.close()
 
         if updated > 0:
-            await update.message.reply_text(f"✏️ Countdown `[ID: {date_id}]` updated to **{title}** on {tdate}!", parse_mode="Markdown", reply_markup=get_main_keyboard())
+            await update.message.reply_text(f"✏️ Countdown `[ID: {date_id}]` updated to *{title}* on {tdate}!", parse_mode="Markdown", reply_markup=get_main_keyboard())
         else:
             await update.message.reply_text(f"⚠️ Countdown ID `{date_id}` not found.", parse_mode="Markdown")
     except ValueError:
@@ -522,16 +522,16 @@ def get_countdowns_text():
         return "⏳ No countdowns saved. Add one using `/adddate Title | YYYY-MM-DD`."
 
     today = datetime.now().date()
-    res = "⏳ **Special Date Countdowns**\n\n"
+    res = "⏳ *Special Date Countdowns*\n\n"
     for did, title, tdate_str in rows:
         tdate = datetime.strptime(tdate_str, "%Y-%m-%d").date()
         days_left = (tdate - today).days
         if days_left > 0:
-            res += f"• `[ID:{did}]` **{title}**: {days_left} days left _({tdate.strftime('%b %d, %Y')})_\n"
+            res += f"• `[ID:{did}]` *{title}*: {days_left} days left _({tdate.strftime('%b %d, %Y')})_\n"
         elif days_left == 0:
-            res += f"🎉 `[ID:{did}]` **{title}** is TODAY!\n"
+            res += f"🎉 `[ID:{did}]` *{title}* is TODAY!\n"
         else:
-            res += f"• `[ID:{did}]` **{title}**: Passed {abs(days_left)} days ago\n"
+            res += f"• `[ID:{did}]` *{title}*: Passed {abs(days_left)} days ago\n"
     return res
 
 # ==================== GRATITUDE / LOVE NOTES ====================
@@ -544,7 +544,7 @@ async def add_thankyou(update: Update, context: ContextTypes.DEFAULT_TYPE):
     note = " ".join(context.args).strip()
 
     if not note:
-        await update.message.reply_text("⚠️ **Format:** `/thankyou Thanks for coffee today!`", parse_mode="Markdown")
+        await update.message.reply_text("⚠️ *Format:* `/thankyou Thanks for coffee today!`", parse_mode="Markdown")
         return
 
     conn = sqlite3.connect(DB_PATH)
@@ -563,7 +563,7 @@ async def delete_thankyou(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_authorized(update):
         return
     if not context.args or not context.args[0].isdigit():
-        await update.message.reply_text("⚠️ **Format:** `/delnote <ID>`\nExample: `/delnote 4`", parse_mode="Markdown")
+        await update.message.reply_text("⚠️ *Format:* `/delnote <ID>`\nExample: `/delnote 4`", parse_mode="Markdown")
         return
 
     note_id = int(context.args[0])
@@ -585,7 +585,7 @@ async def edit_thankyou(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     raw_args = " ".join(context.args)
     if "|" not in raw_args:
-        await update.message.reply_text("⚠️ **Format:** `/editnote <ID> | <new note>`\nExample: `/editnote 4 | Thanks for picking up groceries!`", parse_mode="Markdown")
+        await update.message.reply_text("⚠️ *Format:* `/editnote <ID> | <new note>`\nExample: `/editnote 4 | Thanks for picking up groceries!`", parse_mode="Markdown")
         return
 
     parts = raw_args.split("|", 1)
@@ -618,10 +618,10 @@ def get_gratitude_text():
     if not rows:
         return "💌 No love notes saved yet! Send one using `/thankyou <your note>`."
 
-    res = "💌 **Recent Love & Gratitude Notes**\n\n"
+    res = "💌 *Recent Love & Gratitude Notes*\n\n"
     for nid, sender, note_text, created_at in rows:
         dt = datetime.strptime(created_at, "%Y-%m-%d %H:%M:%S")
-        res += f"• `[ID:{nid}]` **{sender}** _({dt.strftime('%b %d')})_: \"{note_text}\"\n"
+        res += f"• `[ID:{nid}]` *{sender}* _({dt.strftime('%b %d')})_: \"{note_text}\"\n"
     return res
 
 # ==================== UTILITY FUNCTIONS ====================
@@ -631,7 +631,7 @@ def calculate_free_time():
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     
-    results = "🔍 **Joint Free Time (Next 7 Days)**\n\n"
+    results = "🔍 *Joint Free Time (Next 7 Days)*\n\n"
     for day_offset in range(7):
         target_day = now + timedelta(days=day_offset)
         day_start = target_day.replace(hour=9, minute=0, second=0)
@@ -644,9 +644,9 @@ def calculate_free_time():
         busy_slots = cursor.fetchall()
         
         if not busy_slots:
-            results += f"🟢 **{target_day.strftime('%a, %b %d')}**: Fully Free (9:00 AM - 10:00 PM)\n"
+            results += f"🟢 *{target_day.strftime('%a, %b %d')}*: Fully Free (9:00 AM - 10:00 PM)\n"
         else:
-            results += f"🟡 **{target_day.strftime('%a, %b %d')}**: Free outside these times:\n"
+            results += f"🟡 *{target_day.strftime('%a, %b %d')}*: Free outside these times:\n"
             for (s_str, e_str) in busy_slots:
                 s_dt = datetime.strptime(s_str, "%Y-%m-%d %H:%M:%S")
                 e_dt = datetime.strptime(e_str, "%Y-%m-%d %H:%M:%S")
@@ -662,7 +662,7 @@ async def spin_decision(update: Update, context: ContextTypes.DEFAULT_TYPE):
     raw_args = " ".join(context.args)
     if not raw_args or "|" not in raw_args:
         await update.message.reply_text(
-            "🎰 **How to use /spin:**\n`/spin Italian | Sushi | Burgers`",
+            "🎰 *How to use /spin:*\n`/spin Italian | Sushi | Burgers`",
             parse_mode="Markdown"
         )
         return
@@ -674,7 +674,7 @@ async def spin_decision(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     chosen = random.choice(options)
     await update.message.reply_text(
-        f"🎰 **Decision Spinner**\n\nOptions: {', '.join(options)}\n\n✨ **The Spinner Chose:** 👉 **{chosen}**",
+        f"🎰 *Decision Spinner*\n\nOptions: {', '.join(options)}\n\n✨ *The Spinner Chose:* 👉 *{chosen}*",
         parse_mode="Markdown",
         reply_markup=get_main_keyboard()
     )
@@ -699,7 +699,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif data == "pick_date":
         text = pick_random_idea()
     elif data == "help_spin":
-        text = "🎯 **Decision Spinner**\n\nType `/spin Option 1 | Option 2 | Option 3` in the chat to let the bot decide!"
+        text = "🎯 *Decision Spinner*\n\nType `/spin Option 1 | Option 2 | Option 3` in the chat to let the bot decide!"
     elif data == "view_countdowns":
         text = get_countdowns_text()
     elif data == "view_thanks":
@@ -743,6 +743,11 @@ ptb_app.add_handler(CommandHandler("freetime", lambda u, c: u.message.reply_text
 # Callbacks
 ptb_app.add_handler(CallbackQueryHandler(button_callback))
 
+# --- Single Persistent Event Loop for Instant Webhook Responses ---
+loop = asyncio.new_event_loop()
+asyncio.set_event_loop(loop)
+loop.run_until_complete(ptb_app.initialize())
+
 # --- Flask Routes for Webhook Server ---
 @flask_app.route("/", methods=["GET"])
 def index():
@@ -753,11 +758,7 @@ def webhook():
     if request.method == "POST":
         try:
             update = Update.de_json(request.get_json(force=True), ptb_app.bot)
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            loop.run_until_complete(ptb_app.initialize())
             loop.run_until_complete(ptb_app.process_update(update))
-            loop.close()
             return "ok", 200
         except Exception as e:
             return str(e), 500
