@@ -86,7 +86,7 @@ def get_main_keyboard():
             InlineKeyboardButton("💡 Date Ideas", callback_data="view_bucket"),
         ],
         [
-            InlineKeyboardButton("🎲 Pick For Us", callback_data="pick_date"),
+            InlineKeyboardButton("🎲 Pick A Place", callback_data="pick_date"),
             InlineKeyboardButton("🎯 Help Us Decide", callback_data="help_spin"),
         ],
         [
