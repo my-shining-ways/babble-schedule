@@ -86,8 +86,8 @@ def get_main_keyboard():
             InlineKeyboardButton("💡 Date Ideas", callback_data="view_bucket"),
         ],
         [
-            InlineKeyboardButton("🎲 Pick For Us", callback_data="pick_date"),
-            InlineKeyboardButton("🎯 Help Us Decide", callback_data="help_spin"),
+            InlineKeyboardButton("🍴 Pick A Place For Us", callback_data="pick_date"),
+            InlineKeyboardButton("🎲 Help Us Decide", callback_data="help_spin"),
         ],
         [
             InlineKeyboardButton("⏳ Countdowns", callback_data="view_countdowns"),
@@ -104,13 +104,17 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     welcome_text = (
         "💕 **Wei Wei & Kay Kay's Agenda**\n\n"
         "What are we up to today?\n\n"
-        "**Quick cheat sheet:**\n"
+        "**📌 Quick Add Cheat Sheet:**\n"
         "• `/add Title | YYYY-MM-DD HH:MM - HH:MM | [Loc] | [Notes]`\n"
-        "• `/freetime` — see when we're both free\n"
-        "• `/addidea <idea>` — save a date idea\n"
-        "• `/adddate <event> | YYYY-MM-DD` — set a countdown\n"
-        "• `/spin opt1 | opt2` — tiebreaker spinner\n"
-        "• `/thankyou <note>` — leave a cute note\n\n"
+        "• `/addidea <idea>` — save date idea\n"
+        "• `/adddate <event> | YYYY-MM-DD` — countdown\n"
+        "• `/thankyou <note>` — leave love note\n"
+        "• `/freetime` | `/spin opt1 | opt2`\n\n"
+        "**✏️ Edit / Delete (use ID from lists):**\n"
+        "• `/delevent <id>` | `/editevent <id> | Title | ...`\n"
+        "• `/delidea <id>` | `/editidea <id> | <new idea>`\n"
+        "• `/deldate <id>` | `/editdate <id> | Title | YYYY-MM-DD`\n"
+        "• `/delnote <id>` | `/editnote <id> | <new note>`\n\n"
         "_Tap a button below to check schedule & notes!_"
     )
     
@@ -127,7 +131,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             welcome_text, parse_mode="Markdown", reply_markup=get_main_keyboard()
         )
 
-# --- Add Event Handler ---
+# ==================== SCHEDULE / EVENTS ====================
+
 async def add_event(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_authorized(update):
         return
@@ -168,11 +173,12 @@ async def add_event(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "INSERT INTO events (user_name, title, start_time, end_time, location, notes) VALUES (?, ?, ?, ?, ?, ?)",
             (user_name, title, start_time.strftime("%Y-%m-%d %H:%M:%S"), end_time.strftime("%Y-%m-%d %H:%M:%S"), location, notes)
         )
+        event_id = cursor.lastrowid
         conn.commit()
         conn.close()
 
         formatted_time = f"{start_time.strftime('%a, %b %d @ %I:%M %p')} - {end_time.strftime('%I:%M %p')}"
-        msg = f"✅ **Added by {user_name}!**\n📌 **{title}**\n📅 {formatted_time}"
+        msg = f"✅ **Added (ID: {event_id}) by {user_name}!**\n📌 **{title}**\n📅 {formatted_time}"
         if location:
             msg += f"\n📍 Location: {location}"
         if notes:
@@ -185,7 +191,73 @@ async def add_event(update: Update, context: ContextTypes.DEFAULT_TYPE):
             parse_mode="Markdown"
         )
 
-# --- Views: Week & Month ---
+async def delete_event(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not is_authorized(update):
+        return
+    if not context.args or not context.args[0].isdigit():
+        await update.message.reply_text("⚠️ **Format:** `/delevent <ID>`\nExample: `/delevent 3`", parse_mode="Markdown")
+        return
+
+    event_id = int(context.args[0])
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM events WHERE id = ?", (event_id,))
+    deleted = cursor.rowcount
+    conn.commit()
+    conn.close()
+
+    if deleted > 0:
+        await update.message.reply_text(f"🗑️ Schedule `[ID: {event_id}]` deleted!", parse_mode="Markdown", reply_markup=get_main_keyboard())
+    else:
+        await update.message.reply_text(f"⚠️ Schedule ID `{event_id}` not found.", parse_mode="Markdown")
+
+async def edit_event(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not is_authorized(update):
+        return
+
+    raw_args = " ".join(context.args)
+    parts = [p.strip() for p in raw_args.split("|")]
+    if len(parts) < 3 or not parts[0].isdigit():
+        await update.message.reply_text(
+            "⚠️ **Format:** `/editevent <ID> | Title | YYYY-MM-DD HH:MM - HH:MM | [Location] | [Notes]`\n"
+            "Example: `/editevent 3 | Dinner | 2026-08-08 19:00 - 21:00 | VivoCity`",
+            parse_mode="Markdown"
+        )
+        return
+
+    event_id = int(parts[0])
+    title = parts[1]
+    time_part = parts[2]
+    location = parts[3] if len(parts) > 3 else ""
+    notes = parts[4] if len(parts) > 4 else ""
+
+    try:
+        if "-" in time_part:
+            start_str, end_time_str = time_part.rsplit("-", 1)
+            start_time = datetime.strptime(start_str.strip(), "%Y-%m-%d %H:%M")
+            end_time_dt = datetime.strptime(end_time_str.strip(), "%H:%M").time()
+            end_time = datetime.combine(start_time.date(), end_time_dt)
+        else:
+            start_time = datetime.strptime(time_part.strip(), "%Y-%m-%d %H:%M")
+            end_time = start_time + timedelta(hours=1)
+
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute(
+            "UPDATE events SET title=?, start_time=?, end_time=?, location=?, notes=? WHERE id=?",
+            (title, start_time.strftime("%Y-%m-%d %H:%M:%S"), end_time.strftime("%Y-%m-%d %H:%M:%S"), location, notes, event_id)
+        )
+        updated = cursor.rowcount
+        conn.commit()
+        conn.close()
+
+        if updated > 0:
+            await update.message.reply_text(f"✏️ Schedule `[ID: {event_id}]` updated to **{title}**!", parse_mode="Markdown", reply_markup=get_main_keyboard())
+        else:
+            await update.message.reply_text(f"⚠️ Schedule ID `{event_id}` not found.", parse_mode="Markdown")
+    except Exception:
+        await update.message.reply_text("⚠️ Invalid format/time. Example:\n`/editevent 3 | Dinner | 2026-08-08 19:00 - 21:00`", parse_mode="Markdown")
+
 def get_week_text():
     now = datetime.now()
     week_end = now + timedelta(days=7)
@@ -193,7 +265,7 @@ def get_week_text():
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     cursor.execute(
-        "SELECT user_name, title, start_time, end_time, location, notes FROM events WHERE start_time >= ? AND start_time <= ? ORDER BY start_time ASC",
+        "SELECT id, user_name, title, start_time, end_time, location, notes FROM events WHERE start_time >= ? AND start_time <= ? ORDER BY start_time ASC",
         (now.strftime("%Y-%m-%d 00:00:00"), week_end.strftime("%Y-%m-%d 23:59:59"))
     )
     rows = cursor.fetchall()
@@ -203,7 +275,7 @@ def get_week_text():
         response += "\n✨ No scheduled activities! Perfect time to plan a date.\n"
     else:
         current_day = ""
-        for user_name, title, stime_str, etime_str, loc, notes in rows:
+        for eid, user_name, title, stime_str, etime_str, loc, notes in rows:
             s_dt = datetime.strptime(stime_str, "%Y-%m-%d %H:%M:%S")
             e_dt = datetime.strptime(etime_str, "%Y-%m-%d %H:%M:%S")
             day_header = s_dt.strftime("%A, %b %d")
@@ -213,7 +285,7 @@ def get_week_text():
                 response += f"\n📅 **{current_day}**\n"
             
             time_slot = f"{s_dt.strftime('%I:%M %p')} - {e_dt.strftime('%I:%M %p')}"
-            entry = f"  • `{time_slot}` - {title} _({user_name})_"
+            entry = f"  • `[ID:{eid}]` `{time_slot}` - {title} _({user_name})_"
             if loc:
                 entry += f" 📍_{loc}_"
             if notes:
@@ -222,7 +294,7 @@ def get_week_text():
 
     week_ago = now - timedelta(days=7)
     cursor.execute(
-        "SELECT user_name, note FROM gratitude_notes WHERE created_at >= ? ORDER BY created_at DESC",
+        "SELECT id, user_name, note FROM gratitude_notes WHERE created_at >= ? ORDER BY created_at DESC",
         (week_ago.strftime("%Y-%m-%d %H:%M:%S"),)
     )
     thanks_rows = cursor.fetchall()
@@ -230,8 +302,8 @@ def get_week_text():
 
     if thanks_rows:
         response += "\n\n💌 **Love Notes This Week:**\n"
-        for sender, note_text in thanks_rows:
-            response += f"• _{sender}_: \"{note_text}\"\n"
+        for nid, sender, note_text in thanks_rows:
+            response += f"• `[ID:{nid}]` _{sender}_: \"{note_text}\"\n"
 
     return response
 
@@ -243,7 +315,7 @@ def get_month_text():
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     cursor.execute(
-        "SELECT user_name, title, start_time, end_time, location FROM events WHERE start_time >= ? AND start_time <= ? ORDER BY start_time ASC",
+        "SELECT id, user_name, title, start_time, end_time, location FROM events WHERE start_time >= ? AND start_time <= ? ORDER BY start_time ASC",
         (start_of_month.strftime("%Y-%m-%d %H:%M:%S"), end_of_month.strftime("%Y-%m-%d %H:%M:%S"))
     )
     rows = cursor.fetchall()
@@ -254,14 +326,306 @@ def get_month_text():
         return f"✨ No activities scheduled for **{month_name}** yet."
 
     response = f"📆 **Month at a Glance ({month_name})**\n\n"
-    for user_name, title, stime_str, etime_str, loc in rows:
+    for eid, user_name, title, stime_str, etime_str, loc in rows:
         s_dt = datetime.strptime(stime_str, "%Y-%m-%d %H:%M:%S")
         e_dt = datetime.strptime(etime_str, "%Y-%m-%d %H:%M:%S")
         loc_str = f" [📍 {loc}]" if loc else ""
-        response += f"• **{s_dt.strftime('%b %d (%a)')}** (`{s_dt.strftime('%I:%M %p')}-{e_dt.strftime('%I:%M %p')}`): {title} _({user_name})_{loc_str}\n"
+        response += f"• `[ID:{eid}]` **{s_dt.strftime('%b %d (%a)')}** (`{s_dt.strftime('%I:%M %p')}-{e_dt.strftime('%I:%M %p')}`): {title} _({user_name})_{loc_str}\n"
     return response
 
-# --- Smart Free Time Finder ---
+# ==================== DATE IDEAS / WISHLIST ====================
+
+async def add_idea(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not is_authorized(update):
+        return
+
+    user_name = update.effective_user.first_name
+    idea = " ".join(context.args).strip()
+    if not idea:
+        await update.message.reply_text("⚠️ **Format:** `/addidea Try new cafe`", parse_mode="Markdown")
+        return
+
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("INSERT INTO bucket_list (user_name, idea) VALUES (?, ?)", (user_name, idea))
+    idea_id = cursor.lastrowid
+    conn.commit()
+    conn.close()
+
+    await update.message.reply_text(f"💡 Added to Wishlist `[ID: {idea_id}]`: **{idea}**", parse_mode="Markdown", reply_markup=get_main_keyboard())
+
+async def delete_idea(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not is_authorized(update):
+        return
+    if not context.args or not context.args[0].isdigit():
+        await update.message.reply_text("⚠️ **Format:** `/delidea <ID>`\nExample: `/delidea 2`", parse_mode="Markdown")
+        return
+
+    idea_id = int(context.args[0])
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM bucket_list WHERE id = ?", (idea_id,))
+    deleted = cursor.rowcount
+    conn.commit()
+    conn.close()
+
+    if deleted > 0:
+        await update.message.reply_text(f"🗑️ Date idea `[ID: {idea_id}]` removed!", parse_mode="Markdown", reply_markup=get_main_keyboard())
+    else:
+        await update.message.reply_text(f"⚠️ Idea ID `{idea_id}` not found.", parse_mode="Markdown")
+
+async def edit_idea(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not is_authorized(update):
+        return
+
+    raw_args = " ".join(context.args)
+    if "|" not in raw_args:
+        await update.message.reply_text("⚠️ **Format:** `/editidea <ID> | <new idea>`\nExample: `/editidea 2 | Go ice skating`", parse_mode="Markdown")
+        return
+
+    parts = raw_args.split("|", 1)
+    if not parts[0].strip().isdigit():
+        await update.message.reply_text("⚠️ Invalid ID number.", parse_mode="Markdown")
+        return
+
+    idea_id = int(parts[0].strip())
+    new_idea = parts[1].strip()
+
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("UPDATE bucket_list SET idea = ? WHERE id = ?", (new_idea, idea_id))
+    updated = cursor.rowcount
+    conn.commit()
+    conn.close()
+
+    if updated > 0:
+        await update.message.reply_text(f"✏️ Date idea `[ID: {idea_id}]` updated to: **{new_idea}**", parse_mode="Markdown", reply_markup=get_main_keyboard())
+    else:
+        await update.message.reply_text(f"⚠️ Idea ID `{idea_id}` not found.", parse_mode="Markdown")
+
+def get_bucket_text():
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, user_name, idea FROM bucket_list")
+    rows = cursor.fetchall()
+    conn.close()
+
+    if not rows:
+        return "💡 Your Date Wishlist is empty! Use `/addidea <idea>` to add items."
+
+    res = "💡 **Date Night Wishlist**\n\n"
+    for item_id, user_name, idea in rows:
+        res += f"• `[ID:{item_id}]` {idea} _(added by {user_name})_\n"
+    return res
+
+def pick_random_idea():
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, idea, user_name FROM bucket_list")
+    rows = cursor.fetchall()
+    conn.close()
+
+    if not rows:
+        return "🎲 Your wishlist is empty! Add ideas first using `/addidea`."
+    
+    item_id, selected_idea, user_name = random.choice(rows)
+    return f"🎲 **Random Date Pick:**\n\n👉 `[ID:{item_id}]` **{selected_idea}**\n_(Added by {user_name})_"
+
+# ==================== SPECIAL DATES / COUNTDOWNS ====================
+
+async def add_special_date(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not is_authorized(update):
+        return
+
+    raw_args = " ".join(context.args)
+    if "|" not in raw_args:
+        await update.message.reply_text("⚠️ Format: `/adddate Anniversary | YYYY-MM-DD`", parse_mode="Markdown")
+        return
+
+    title, date_str = raw_args.split("|")
+    title = title.strip()
+    
+    try:
+        tdate = datetime.strptime(date_str.strip(), "%Y-%m-%d").date()
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("INSERT INTO special_dates (title, target_date) VALUES (?, ?)", (title, tdate.strftime("%Y-%m-%d")))
+        date_id = cursor.lastrowid
+        conn.commit()
+        conn.close()
+
+        await update.message.reply_text(f"⏳ Countdown added `[ID: {date_id}]` for **{title}** on {tdate}!", parse_mode="Markdown", reply_markup=get_main_keyboard())
+    except ValueError:
+        await update.message.reply_text("⚠️ Invalid date format. Use `YYYY-MM-DD`.")
+
+async def delete_special_date(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not is_authorized(update):
+        return
+    if not context.args or not context.args[0].isdigit():
+        await update.message.reply_text("⚠️ **Format:** `/deldate <ID>`\nExample: `/deldate 1`", parse_mode="Markdown")
+        return
+
+    date_id = int(context.args[0])
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM special_dates WHERE id = ?", (date_id,))
+    deleted = cursor.rowcount
+    conn.commit()
+    conn.close()
+
+    if deleted > 0:
+        await update.message.reply_text(f"🗑️ Countdown `[ID: {date_id}]` deleted!", parse_mode="Markdown", reply_markup=get_main_keyboard())
+    else:
+        await update.message.reply_text(f"⚠️ Countdown ID `{date_id}` not found.", parse_mode="Markdown")
+
+async def edit_special_date(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not is_authorized(update):
+        return
+
+    raw_args = " ".join(context.args)
+    if "|" not in raw_args:
+        await update.message.reply_text("⚠️ **Format:** `/editdate <ID> | Title | YYYY-MM-DD`\nExample: `/editdate 1 | Trip to Japan | 2026-12-15`", parse_mode="Markdown")
+        return
+
+    parts = [p.strip() for p in raw_args.split("|")]
+    if not parts[0].isdigit() or len(parts) < 3:
+        await update.message.reply_text("⚠️ Invalid format. Example: `/editdate 1 | Trip to Japan | 2026-12-15`", parse_mode="Markdown")
+        return
+
+    date_id = int(parts[0])
+    title = parts[1]
+    
+    try:
+        tdate = datetime.strptime(parts[2], "%Y-%m-%d").date()
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("UPDATE special_dates SET title = ?, target_date = ? WHERE id = ?", (title, tdate.strftime("%Y-%m-%d"), date_id))
+        updated = cursor.rowcount
+        conn.commit()
+        conn.close()
+
+        if updated > 0:
+            await update.message.reply_text(f"✏️ Countdown `[ID: {date_id}]` updated to **{title}** on {tdate}!", parse_mode="Markdown", reply_markup=get_main_keyboard())
+        else:
+            await update.message.reply_text(f"⚠️ Countdown ID `{date_id}` not found.", parse_mode="Markdown")
+    except ValueError:
+        await update.message.reply_text("⚠️ Invalid date format. Use `YYYY-MM-DD`.")
+
+def get_countdowns_text():
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, title, target_date FROM special_dates ORDER BY target_date ASC")
+    rows = cursor.fetchall()
+    conn.close()
+
+    if not rows:
+        return "⏳ No countdowns saved. Add one using `/adddate Title | YYYY-MM-DD`."
+
+    today = datetime.now().date()
+    res = "⏳ **Special Date Countdowns**\n\n"
+    for did, title, tdate_str in rows:
+        tdate = datetime.strptime(tdate_str, "%Y-%m-%d").date()
+        days_left = (tdate - today).days
+        if days_left > 0:
+            res += f"• `[ID:{did}]` **{title}**: {days_left} days left _({tdate.strftime('%b %d, %Y')})_\n"
+        elif days_left == 0:
+            res += f"🎉 `[ID:{did}]` **{title}** is TODAY!\n"
+        else:
+            res += f"• `[ID:{did}]` **{title}**: Passed {abs(days_left)} days ago\n"
+    return res
+
+# ==================== GRATITUDE / LOVE NOTES ====================
+
+async def add_thankyou(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not is_authorized(update):
+        return
+
+    user_name = update.effective_user.first_name
+    note = " ".join(context.args).strip()
+
+    if not note:
+        await update.message.reply_text("⚠️ **Format:** `/thankyou Thanks for coffee today!`", parse_mode="Markdown")
+        return
+
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute(
+        "INSERT INTO gratitude_notes (user_name, note, created_at) VALUES (?, ?, ?)",
+        (user_name, note, datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+    )
+    note_id = cursor.lastrowid
+    conn.commit()
+    conn.close()
+
+    await update.message.reply_text(f"💌 Note `[ID: {note_id}]` saved, {user_name}!", parse_mode="Markdown", reply_markup=get_main_keyboard())
+
+async def delete_thankyou(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not is_authorized(update):
+        return
+    if not context.args or not context.args[0].isdigit():
+        await update.message.reply_text("⚠️ **Format:** `/delnote <ID>`\nExample: `/delnote 4`", parse_mode="Markdown")
+        return
+
+    note_id = int(context.args[0])
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM gratitude_notes WHERE id = ?", (note_id,))
+    deleted = cursor.rowcount
+    conn.commit()
+    conn.close()
+
+    if deleted > 0:
+        await update.message.reply_text(f"🗑️ Love note `[ID: {note_id}]` deleted!", parse_mode="Markdown", reply_markup=get_main_keyboard())
+    else:
+        await update.message.reply_text(f"⚠️ Note ID `{note_id}` not found.", parse_mode="Markdown")
+
+async def edit_thankyou(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not is_authorized(update):
+        return
+
+    raw_args = " ".join(context.args)
+    if "|" not in raw_args:
+        await update.message.reply_text("⚠️ **Format:** `/editnote <ID> | <new note>`\nExample: `/editnote 4 | Thanks for picking up groceries!`", parse_mode="Markdown")
+        return
+
+    parts = raw_args.split("|", 1)
+    if not parts[0].strip().isdigit():
+        await update.message.reply_text("⚠️ Invalid ID number.", parse_mode="Markdown")
+        return
+
+    note_id = int(parts[0].strip())
+    new_note = parts[1].strip()
+
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("UPDATE gratitude_notes SET note = ? WHERE id = ?", (new_note, note_id))
+    updated = cursor.rowcount
+    conn.commit()
+    conn.close()
+
+    if updated > 0:
+        await update.message.reply_text(f"✏️ Love note `[ID: {note_id}]` updated to: \"{new_note}\"", parse_mode="Markdown", reply_markup=get_main_keyboard())
+    else:
+        await update.message.reply_text(f"⚠️ Note ID `{note_id}` not found.", parse_mode="Markdown")
+
+def get_gratitude_text():
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, user_name, note, created_at FROM gratitude_notes ORDER BY created_at DESC LIMIT 10")
+    rows = cursor.fetchall()
+    conn.close()
+
+    if not rows:
+        return "💌 No love notes saved yet! Send one using `/thankyou <your note>`."
+
+    res = "💌 **Recent Love & Gratitude Notes**\n\n"
+    for nid, sender, note_text, created_at in rows:
+        dt = datetime.strptime(created_at, "%Y-%m-%d %H:%M:%S")
+        res += f"• `[ID:{nid}]` **{sender}** _({dt.strftime('%b %d')})_: \"{note_text}\"\n"
+    return res
+
+# ==================== UTILITY FUNCTIONS ====================
+
 def calculate_free_time():
     now = datetime.now()
     conn = sqlite3.connect(DB_PATH)
@@ -291,7 +655,6 @@ def calculate_free_time():
     conn.close()
     return results
 
-# --- /spin Decision Maker ---
 async def spin_decision(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_authorized(update):
         return
@@ -315,139 +678,6 @@ async def spin_decision(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parse_mode="Markdown",
         reply_markup=get_main_keyboard()
     )
-
-# --- /thankyou Gratitude Notes ---
-async def add_thankyou(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not is_authorized(update):
-        return
-
-    user_name = update.effective_user.first_name
-    note = " ".join(context.args).strip()
-
-    if not note:
-        await update.message.reply_text("⚠️ **Format:** `/thankyou Thanks for coffee today!`", parse_mode="Markdown")
-        return
-
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute(
-        "INSERT INTO gratitude_notes (user_name, note, created_at) VALUES (?, ?, ?)",
-        (user_name, note, datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-    )
-    conn.commit()
-    conn.close()
-
-    await update.message.reply_text(f"💌 Note saved, {user_name}!", parse_mode="Markdown", reply_markup=get_main_keyboard())
-
-def get_gratitude_text():
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute("SELECT user_name, note, created_at FROM gratitude_notes ORDER BY created_at DESC LIMIT 10")
-    rows = cursor.fetchall()
-    conn.close()
-
-    if not rows:
-        return "💌 No love notes saved yet! Send one using `/thankyou <your note>`."
-
-    res = "💌 **Recent Love & Gratitude Notes**\n\n"
-    for sender, note_text, created_at in rows:
-        dt = datetime.strptime(created_at, "%Y-%m-%d %H:%M:%S")
-        res += f"• **{sender}** _({dt.strftime('%b %d')})_: \"{note_text}\"\n"
-    return res
-
-# --- Bucket List & Countdowns ---
-async def add_idea(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not is_authorized(update):
-        return
-
-    user_name = update.effective_user.first_name
-    idea = " ".join(context.args).strip()
-    if not idea:
-        await update.message.reply_text("⚠️ **Format:** `/addidea Try new cafe`", parse_mode="Markdown")
-        return
-
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute("INSERT INTO bucket_list (user_name, idea) VALUES (?, ?)", (user_name, idea))
-    conn.commit()
-    conn.close()
-
-    await update.message.reply_text(f"💡 Added to Date Wishlist: **{idea}**", parse_mode="Markdown", reply_markup=get_main_keyboard())
-
-def get_bucket_text():
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute("SELECT id, user_name, idea FROM bucket_list")
-    rows = cursor.fetchall()
-    conn.close()
-
-    if not rows:
-        return "💡 Your Date Wishlist is empty! Use `/addidea <idea>` to add items."
-
-    res = "💡 **Date Night Wishlist**\n\n"
-    for item_id, user_name, idea in rows:
-        res += f"• `{item_id}`. {idea} _(added by {user_name})_\n"
-    return res
-
-def pick_random_idea():
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute("SELECT idea, user_name FROM bucket_list")
-    rows = cursor.fetchall()
-    conn.close()
-
-    if not rows:
-        return "🎲 Your wishlist is empty! Add ideas first using `/addidea`."
-    
-    selected_idea, user_name = random.choice(rows)
-    return f"🎲 **Random Date Pick:**\n\n👉 **{selected_idea}**\n_(Added by {user_name})_"
-
-async def add_special_date(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not is_authorized(update):
-        return
-
-    raw_args = " ".join(context.args)
-    if "|" not in raw_args:
-        await update.message.reply_text("⚠️ Format: `/adddate Anniversary | YYYY-MM-DD`", parse_mode="Markdown")
-        return
-
-    title, date_str = raw_args.split("|")
-    title = title.strip()
-    
-    try:
-        tdate = datetime.strptime(date_str.strip(), "%Y-%m-%d").date()
-        conn = sqlite3.connect(DB_PATH)
-        cursor = conn.cursor()
-        cursor.execute("INSERT INTO special_dates (title, target_date) VALUES (?, ?)", (title, tdate.strftime("%Y-%m-%d")))
-        conn.commit()
-        conn.close()
-
-        await update.message.reply_text(f"⏳ Countdown added for **{title}** on {tdate}!", parse_mode="Markdown", reply_markup=get_main_keyboard())
-    except ValueError:
-        await update.message.reply_text("⚠️ Invalid date format. Use `YYYY-MM-DD`.")
-
-def get_countdowns_text():
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute("SELECT title, target_date FROM special_dates ORDER BY target_date ASC")
-    rows = cursor.fetchall()
-    conn.close()
-
-    if not rows:
-        return "⏳ No countdowns saved. Add one using `/adddate Title | YYYY-MM-DD`."
-
-    today = datetime.now().date()
-    res = "⏳ **Special Date Countdowns**\n\n"
-    for title, tdate_str in rows:
-        tdate = datetime.strptime(tdate_str, "%Y-%m-%d").date()
-        days_left = (tdate - today).days
-        if days_left > 0:
-            res += f"• **{title}**: {days_left} days left _({tdate.strftime('%b %d, %Y')})_\n"
-        elif days_left == 0:
-            res += f"🎉 **{title}** is TODAY!\n"
-        else:
-            res += f"• **{title}**: Passed {abs(days_left)} days ago\n"
-    return res
 
 # --- Callback Handler ---
 async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -481,14 +711,36 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # --- Build Telegram Application & Handlers ---
 ptb_app = ApplicationBuilder().token(TOKEN).build()
+
+# Start & Help
 ptb_app.add_handler(CommandHandler("start", start))
 ptb_app.add_handler(CommandHandler("help", start))
+
+# Events / Schedule
 ptb_app.add_handler(CommandHandler("add", add_event))
+ptb_app.add_handler(CommandHandler("delevent", delete_event))
+ptb_app.add_handler(CommandHandler("editevent", edit_event))
+
+# Wishlist / Date Ideas
 ptb_app.add_handler(CommandHandler("addidea", add_idea))
+ptb_app.add_handler(CommandHandler("delidea", delete_idea))
+ptb_app.add_handler(CommandHandler("editidea", edit_idea))
+
+# Special Dates / Countdowns
 ptb_app.add_handler(CommandHandler("adddate", add_special_date))
-ptb_app.add_handler(CommandHandler("spin", spin_decision))
+ptb_app.add_handler(CommandHandler("deldate", delete_special_date))
+ptb_app.add_handler(CommandHandler("editdate", edit_special_date))
+
+# Gratitude / Love Notes
 ptb_app.add_handler(CommandHandler("thankyou", add_thankyou))
+ptb_app.add_handler(CommandHandler("delnote", delete_thankyou))
+ptb_app.add_handler(CommandHandler("editnote", edit_thankyou))
+
+# Utilities
+ptb_app.add_handler(CommandHandler("spin", spin_decision))
 ptb_app.add_handler(CommandHandler("freetime", lambda u, c: u.message.reply_text(calculate_free_time(), parse_mode="Markdown")))
+
+# Callbacks
 ptb_app.add_handler(CallbackQueryHandler(button_callback))
 
 # --- Flask Routes for Webhook Server ---
