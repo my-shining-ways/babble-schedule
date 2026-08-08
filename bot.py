@@ -1,6 +1,7 @@
 import os
 import sqlite3
 import random
+import asyncio
 from datetime import datetime, timedelta
 from flask import Flask, request
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
@@ -11,7 +12,11 @@ from telegram.ext import (
     ContextTypes,
 )
 
+# --- Configuration & Paths ---
 TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DB_PATH = os.path.join(BASE_DIR, "couple_bot.db")
+
 flask_app = Flask(__name__)
 
 # Put both of your numerical Telegram User IDs here:
@@ -22,12 +27,9 @@ def is_authorized(update: Update) -> bool:
         return True
     return update.effective_user and update.effective_user.id in ALLOWED_USERS
 
-# Initialize Flask app for 24/7 PythonAnywhere Web App
-flask_app = Flask(__name__)
-
 # --- Database Initialization ---
 def init_db():
-    conn = sqlite3.connect("couple_bot.db")
+    conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     
     cursor.execute("""
@@ -160,7 +162,7 @@ async def add_event(update: Update, context: ContextTypes.DEFAULT_TYPE):
             start_time = datetime.strptime(time_part.strip(), "%Y-%m-%d %H:%M")
             end_time = start_time + timedelta(hours=1)
 
-        conn = sqlite3.connect("couple_bot.db")
+        conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
         cursor.execute(
             "INSERT INTO events (user_name, title, start_time, end_time, location, notes) VALUES (?, ?, ?, ?, ?, ?)",
@@ -188,7 +190,7 @@ def get_week_text():
     now = datetime.now()
     week_end = now + timedelta(days=7)
 
-    conn = sqlite3.connect("couple_bot.db")
+    conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     cursor.execute(
         "SELECT user_name, title, start_time, end_time, location, notes FROM events WHERE start_time >= ? AND start_time <= ? ORDER BY start_time ASC",
@@ -238,7 +240,7 @@ def get_month_text():
     start_of_month = now.replace(day=1, hour=0, minute=0, second=0)
     end_of_month = (start_of_month + timedelta(days=32)).replace(day=1) - timedelta(seconds=1)
 
-    conn = sqlite3.connect("couple_bot.db")
+    conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     cursor.execute(
         "SELECT user_name, title, start_time, end_time, location FROM events WHERE start_time >= ? AND start_time <= ? ORDER BY start_time ASC",
@@ -262,7 +264,7 @@ def get_month_text():
 # --- Smart Free Time Finder ---
 def calculate_free_time():
     now = datetime.now()
-    conn = sqlite3.connect("couple_bot.db")
+    conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     
     results = "🔍 **Joint Free Time (Next 7 Days)**\n\n"
@@ -326,7 +328,7 @@ async def add_thankyou(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("⚠️ **Format:** `/thankyou Thanks for coffee today!`", parse_mode="Markdown")
         return
 
-    conn = sqlite3.connect("couple_bot.db")
+    conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     cursor.execute(
         "INSERT INTO gratitude_notes (user_name, note, created_at) VALUES (?, ?, ?)",
@@ -338,7 +340,7 @@ async def add_thankyou(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(f"💌 Note saved, {user_name}!", parse_mode="Markdown", reply_markup=get_main_keyboard())
 
 def get_gratitude_text():
-    conn = sqlite3.connect("couple_bot.db")
+    conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     cursor.execute("SELECT user_name, note, created_at FROM gratitude_notes ORDER BY created_at DESC LIMIT 10")
     rows = cursor.fetchall()
@@ -364,7 +366,7 @@ async def add_idea(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("⚠️ **Format:** `/addidea Try new cafe`", parse_mode="Markdown")
         return
 
-    conn = sqlite3.connect("couple_bot.db")
+    conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     cursor.execute("INSERT INTO bucket_list (user_name, idea) VALUES (?, ?)", (user_name, idea))
     conn.commit()
@@ -373,7 +375,7 @@ async def add_idea(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(f"💡 Added to Date Wishlist: **{idea}**", parse_mode="Markdown", reply_markup=get_main_keyboard())
 
 def get_bucket_text():
-    conn = sqlite3.connect("couple_bot.db")
+    conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     cursor.execute("SELECT id, user_name, idea FROM bucket_list")
     rows = cursor.fetchall()
@@ -388,7 +390,7 @@ def get_bucket_text():
     return res
 
 def pick_random_idea():
-    conn = sqlite3.connect("couple_bot.db")
+    conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     cursor.execute("SELECT idea, user_name FROM bucket_list")
     rows = cursor.fetchall()
@@ -414,7 +416,7 @@ async def add_special_date(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     try:
         tdate = datetime.strptime(date_str.strip(), "%Y-%m-%d").date()
-        conn = sqlite3.connect("couple_bot.db")
+        conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
         cursor.execute("INSERT INTO special_dates (title, target_date) VALUES (?, ?)", (title, tdate.strftime("%Y-%m-%d")))
         conn.commit()
@@ -425,7 +427,7 @@ async def add_special_date(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("⚠️ Invalid date format. Use `YYYY-MM-DD`.")
 
 def get_countdowns_text():
-    conn = sqlite3.connect("couple_bot.db")
+    conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     cursor.execute("SELECT title, target_date FROM special_dates ORDER BY target_date ASC")
     rows = cursor.fetchall()
@@ -495,9 +497,16 @@ def index():
     return "Bot Web App is live 24/7!", 200
 
 @flask_app.route(f"/{TOKEN}", methods=["POST"])
-async def webhook():
+def webhook():
     if request.method == "POST":
-        update = Update.de_json(request.get_json(force=True), ptb_app.bot)
-        await ptb_app.process_update(update)
-        return "ok", 200
+        try:
+            update = Update.de_json(request.get_json(force=True), ptb_app.bot)
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            loop.run_until_complete(ptb_app.initialize())
+            loop.run_until_complete(ptb_app.process_update(update))
+            loop.close()
+            return "ok", 200
+        except Exception as e:
+            return str(e), 500
     return "error", 400
